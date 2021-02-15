@@ -1,162 +1,178 @@
+/**
+ * Standard libraries
+ */ 
 #include <Arduino.h>
+#include <EEPROM.h>
 
 /**
- * Buttons
- * */
-#include "ezButton.h"
-#define runButton 5
-ezButton button(runButton);
-
-/**
- * STEPPER
- * */
-#include "A4988.h"
-#define MOTOR_STEPS 200
-#define RPM 30
-#define MICROSTEPS 8
-#define DIR 8
-#define STEP 9
-A4988 stepper(MOTOR_STEPS, DIR, STEP);
-
-
-/**
- * PUSH MOTOR
- * */
-#include <L298N.h>
-const unsigned int IN1 = 2;
-const unsigned int IN2 = 3;
-unsigned short theSpeed = 255;
-L298N motor(IN1, IN2);
-
-/**
- * Bed Allign
- * 
- * */
-#define BED_ALIGN_PIN A5
-
-
-/**
- * Other variables
+ * Buttons and endstops
  */
-const int FB_DOUBLE_PRESS_TIME = 1000;
-const int FB_HOLD_PRESS_TIME = 2000;
-unsigned int fb_lastPressTime = 0;
-bool fb_waitForDoubleClick = false;
+#include "ezButton.h"
+#define BUTTON_RUN 2
+#define BUTTON_UP 3
+#define BUTTON_DOWN 4
+#define ENDSTOP_CART 5
+#define ENDSTOP_BED 6
+ezButton buttonRun(BUTTON_RUN);
+ezButton buttonUp(BUTTON_UP);
+ezButton buttonDown(BUTTON_DOWN);
+ezButton endstopBed(ENDSTOP_BED);
+ezButton endstopCart(ENDSTOP_CART);
 
-int brake = 0;
-void setup() {
-  Serial.begin(9600);
 
-  //pinMode(BED_ALIGN_PIN,INPUT_PULLUP);
+/**
+ * Steppers
+ */
+#include "A4988.h"
+#define STEPPER_CART_STEPS 200
+#define STEPPER_CART_RPM 30
+#define STEPPER_CART_MICRO 8
+#define STEPPER_CART_DIR 7
+#define STEPPER_CART_STEP 8
+A4988 stepperCart(STEPPER_CART_STEPS,STEPPER_CART_DIR,STEPPER_CART_STEP);
 
-  pinMode(LED_BUILTIN, OUTPUT);
+#define STEPPER_BED_STEPS 200
+#define STEPPER_BED_RPM 30
+#define STEPPER_BED_MICRO 8
+#define STEPPER_BED_DIR 9
+#define STEPPER_BED_STEP 10
+A4988 stepperBed(STEPPER_BED_STEPS,STEPPER_BED_DIR,STEPPER_BED_STEP);
 
-  //stepper
-  stepper.begin(RPM, MICROSTEPS);  
+/**
+ * DC motors
+ */
+#include "L298N.h"
+#define MOTOR_IN1 11
+#define MOTOR_IN2 12
+#define MOTOR_SPEED 255
+L298N motorPush(MOTOR_IN1,MOTOR_IN2);
 
-  //motor
-  motor.setSpeed(theSpeed);
+/**
+ * Other variables and functions
+ */
+void buttonRefresh(){
+  buttonRun.loop();
+  buttonUp.loop();
+  buttonDown.loop();
+  endstopBed.loop();
+  endstopCart.loop();
 }
 
-void motorCallback(){
-
-}
-
-
-void fn1(){
-  Serial.println("single click");
-   Serial.println("The button is pressed");
-      motor.forward();
-      delay(1000);
-      motor.backward();
-      delay(1000);
-      motor.stop();
-      stepper.rotate(360);
-      delay(1000);
-}
-
-void fn2(){
-  Serial.println("double click");
-  if(motor.getDirection() == motor.FORWARD){
-    motor.backward();
-  }else{
-    motor.forward();
+void homeCart(){
+  // home the cart
+  stepperCart.startMove(-10000); //some steps to reach the endstop
+  Serial.println("Stepper cart -> going to home");
+  while(!endstopCart.isPressed()){
+      buttonRefresh();
+      stepperCart.nextAction();
   }
-  
-
+  stepperCart.startBrake();
+  Serial.println("Stepper cart -> at home possition");
 }
 
-void buttonRutine(void (*singleClick)(), void (*doubleClick)()){
-    button.loop();
-
-
-    if(button.isPressed()){
-      
-      Serial.println(fb_waitForDoubleClick);
-
-      if(fb_waitForDoubleClick == false){
-        fb_waitForDoubleClick = true;
-      }else if(fb_waitForDoubleClick == true){
-        if(millis() < (fb_lastPressTime+FB_DOUBLE_PRESS_TIME)){
-          
-          doubleClick();
-          //Serial.println("Double click");
-          fb_waitForDoubleClick = false;
-        }
-      }
-      fb_lastPressTime = millis();
-    }
-
-    if(fb_waitForDoubleClick == true){
-        if(millis() > (fb_lastPressTime+FB_DOUBLE_PRESS_TIME)){
-          
-          //Serial.println("Single click");
-          singleClick();
-          
-          fb_waitForDoubleClick = false;
-          fb_lastPressTime = millis();
-        }
-    }
-
+void homeBed(){
+  // home the bed
+  stepperBed.startMove(300); //some steps to reach the endstop
+  Serial.println("Stepper bed -> going to home");
+  while(!endstopBed.isPressed()){
+      buttonRefresh();
+      stepperBed.nextAction();
   }
+  stepperBed.startBrake();
+  Serial.println("Stepper bed -> at home possition");
+}
+
+/**
+ * EEPROM
+ */
+unsigned int MEMORY_RUN_COUNT_ADDR = 10;
+void writeIntIntoEEPROM(int address, int number)
+{ 
+  EEPROM.write(address, number >> 8);
+  EEPROM.write(address + 1, number & 0xFF);
+}
+
+int readIntFromEEPROM(int address)
+{
+  byte byte1 = EEPROM.read(address);
+  byte byte2 = EEPROM.read(address + 1);
+  return (byte1 << 8) + byte2;
+}
+
+void increaseRunCounter(){
+  int runcount = readIntFromEEPROM(MEMORY_RUN_COUNT_ADDR);
+  writeIntIntoEEPROM(MEMORY_RUN_COUNT_ADDR, runcount+1);
+}
+
+void printRunCount(){
+  Serial.print("COUNTER - RunCount: ");
+  Serial.println(readIntFromEEPROM(MEMORY_RUN_COUNT_ADDR));
+}
+
+void counterResetRutine(){
+  buttonRefresh();
+  if(buttonDown.isPressed() && buttonUp.isPressed()){
+    Serial.println("COUNTER - Counter reset required !");
+    writeIntIntoEEPROM(MEMORY_RUN_COUNT_ADDR,0);
+    printRunCount();
+    Serial.println("COUNTER - Waiting to button release");
+    while(buttonDown.isPressed() && buttonUp.isPressed()){
+      buttonRefresh();
+      delay(5);
+    }
+    Serial.println("COUNTER - Button released, continue.");
+  }
+}
+
+/**
+ * Setup
+ */
+void setup(){
+  Serial.begin(9600); //prepare serial
+  Serial.println("---   FireCaulkGun   ---");
+  printRunCount();
+
+  //check if is required to reset counter
+  counterResetRutine();
+
+  //prepare steppers
+  stepperBed.begin(STEPPER_BED_RPM,STEPPER_BED_MICRO);
+  stepperCart.begin(STEPPER_CART_RPM,STEPPER_CART_MICRO);
+
+  ///prepare motor
+  motorPush.setSpeed(MOTOR_SPEED);
+
+
+  //SETUP RUTINE
+  homeCart();
+  homeBed();
+}
 
 
 void loop(){
-  buttonRutine(fn1,fn2);
+  buttonRefresh(); //refresh buttons
 
+  //check up/down buttons
+  if(buttonUp.isPressed() || buttonDown.isPressed()){
+      if(buttonUp.isPressed()){
+        motorPush.forward();
+      }else{
+        motorPush.backward();
+      }
+  }else{
+    motorPush.stop();
+  }
 
-  
-  
-  /*if(button.isPressed()){
-    if(millis() < (pressedTime+500)){
-      Serial.println("double click");
-    }
-    else if(millis() > (pressedTime+500)){
-        Serial.println("single click");
-    }
-    pressedTime = millis();
-    Serial.println(pressedTime);
-  }*/
-
-  
-  //Serial.println(pressedTime);
-
-
-   
-    /*if(button.isPressed()){
-      Serial.println("The button is pressed");
-      motor.forward();
-      delay(1000);
-      motor.backward();
-      delay(1000);
-      motor.stop();
-      stepper.rotate(360);
-      delay(1000);
-    }
-
-    if(button.isReleased()){
-      Serial.println("The button is released");
-    }*/
-
+  if(buttonRun.isPressed()){
+    Serial.println("RUN - start");
+    //stepperCart.move(-50); //cart to back possition
+    //motorPush.forward(); //start extrude
+    //stepperBed.rotate(360);
+    //motorPush.stop();
+    Serial.println("RUN - done, going to home");
+    homeCart();
+    increaseRunCounter();
+    printRunCount();
+    delay(200);
+  }
 }
-
