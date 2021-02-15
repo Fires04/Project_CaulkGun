@@ -10,13 +10,13 @@ ezButton button(runButton);
 /**
  * STEPPER
  * */
-#include "BasicStepperDriver.h"
+#include "A4988.h"
 #define MOTOR_STEPS 200
 #define RPM 30
 #define MICROSTEPS 8
 #define DIR 8
 #define STEP 9
-BasicStepperDriver stepper(MOTOR_STEPS, DIR, STEP);
+A4988 stepper(MOTOR_STEPS, DIR, STEP);
 
 
 /**
@@ -65,10 +65,25 @@ void motorCallback(){
 
 void fn1(){
   Serial.println("single click");
+   Serial.println("The button is pressed");
+      motor.forward();
+      delay(1000);
+      motor.backward();
+      delay(1000);
+      motor.stop();
+      stepper.rotate(360);
+      delay(1000);
 }
 
 void fn2(){
   Serial.println("double click");
+  if(motor.getDirection() == motor.FORWARD){
+    motor.backward();
+  }else{
+    motor.forward();
+  }
+  
+
 }
 
 void buttonRutine(void (*singleClick)(), void (*doubleClick)()){
