@@ -117,18 +117,14 @@ void printRunCount(){
 }
 
 void counterResetRutine(){
-  buttonRefresh();
-  if(buttonDown.isPressed() && buttonUp.isPressed()){
-    Serial.println("COUNTER - Counter reset required !");
+  Serial.println("COUNTER - routine start !");
+  if((digitalRead(BUTTON_UP) == LOW) && (digitalRead(BUTTON_DOWN) == LOW)){
+    Serial.println("COUNTER - reset required!");
     writeIntIntoEEPROM(MEMORY_RUN_COUNT_ADDR,0);
-    printRunCount();
-    Serial.println("COUNTER - Waiting to button release");
-    while(buttonDown.isPressed() && buttonUp.isPressed()){
-      buttonRefresh();
-      delay(5);
-    }
-    Serial.println("COUNTER - Button released, continue.");
   }
+
+  printRunCount();
+  Serial.println("RESET rutine - end");
 }
 
 /**
@@ -180,6 +176,8 @@ void loop(){
   }
   motorPush.stop();
 
+
+
   //run button
   if(buttonRun.isPressed()){
     Serial.println("RUN - start");
@@ -191,7 +189,8 @@ void loop(){
     motorPush.forward(); //start extrude
     stepperBed.rotate(360*1);
     motorPush.stop();
-    stepperBed.rotate(360*1);
+    stepperBed.rotate(90*1);
+    stepperBed.rotate(-90*1);
     motorPush.setSpeed(MOTOR_SPEED);
     motorPush.backward();
     delay(100);
