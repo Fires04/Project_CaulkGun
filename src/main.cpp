@@ -26,7 +26,7 @@ ezButton endstopCart(ENDSTOP_CART);
  */
 #include "A4988.h"
 #define STEPPER_CART_STEPS 200
-#define STEPPER_CART_RPM 90
+#define STEPPER_CART_RPM 150
 #define STEPPER_CART_MICRO 8
 #define STEPPER_CART_DIR 7
 #define STEPPER_CART_STEP 8
