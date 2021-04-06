@@ -199,6 +199,7 @@ void loop(){
     increaseRunCounter();
     printRunCount();
     homeCart();
+    stepperBed.rotate(45);
     delay(200);
   }
 }
