@@ -47,7 +47,7 @@ A4988 stepperBed(STEPPER_BED_STEPS,STEPPER_BED_DIR,STEPPER_BED_STEP);
 #define MOTOR_IN1 13
 #define MOTOR_IN2 12
 #define MOTOR_SPEED 255
-#define MOTOR_SPEED_EXTRUDE 85
+#define MOTOR_SPEED_EXTRUDE 82
 L298N motorPush(MOTOR_ENABLE,MOTOR_IN1,MOTOR_IN2);
 
 /**
@@ -181,25 +181,30 @@ void loop(){
   //run button
   if(buttonRun.isPressed()){
     Serial.println("RUN - start");
+    stepperBed.rotate(-45*1);
     homeBed();
-    stepperBed.rotate(-45);
+    //stepperBed.rotate(-45);
+    
     homeCart();
     stepperCart.move(5325); //cart to back possition
     motorPush.setSpeed(MOTOR_SPEED_EXTRUDE);
     motorPush.forward(); //start extrude
-    stepperBed.rotate(360*1);
+    stepperBed.rotate(450*1);
     motorPush.stop();
-    stepperBed.rotate(90*1);
-    stepperBed.rotate(-90*1);
+    stepperBed.rotate(360*1);
+    //stepperBed.rotate(-90*1);
     motorPush.setSpeed(MOTOR_SPEED);
     motorPush.backward();
-    delay(100);
+    delay(200);
     motorPush.stop();
     Serial.println("RUN - done, going to home");
     increaseRunCounter();
     printRunCount();
+
     homeCart();
-    stepperBed.rotate(45);
+    //stepperBed.rotate(85);
+        stepperBed.rotate(-45*1);
+    homeBed();
     delay(200);
   }
 }
